@@ -29,8 +29,8 @@ export function GlobalHeader({ darkMode, onToggleDark }: Props) {
 
   return <header className="global-header" onMouseLeave={() => setActiveMega(null)}>
     <div className="global-container global-header-inner">
-      <a className="global-logo" href="/" aria-label="Premier Bank home" onClick={closeMenu} style={{ marginLeft: 110 }}>
-        <Image src={darkMode ? "/images/darkmodelogo.png" : "/images/logo.png"} alt="Premier Bank" width={150} height={68} priority style={{ width: 145, height: "auto" }} />
+      <a className="global-logo" href="/" aria-label="Premier Bank home" onClick={closeMenu}>
+        <Image src={darkMode ? "/images/darkmodelogo.png" : "/images/logo.png"} alt="Premier Bank" width={150} height={68} priority />
       </a>
       <nav className={menuOpen ? "global-nav is-open" : "global-nav"} aria-label="Primary navigation">
         {navigation.map((item) => <button key={item.label} type="button" className="global-nav-mega-trigger" aria-expanded={activeMega === item.label} onMouseEnter={() => { if (window.innerWidth > 820) setActiveMega(item.label); }} onClick={() => openNavigation(item.label)}>{item.label}<ChevronDown size={14} /></button>)}
