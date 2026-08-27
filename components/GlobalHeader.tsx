@@ -18,6 +18,9 @@ export function GlobalHeader({ darkMode, onToggleDark }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeMega, setActiveMega] = useState<string | null>(null);
   const closeMenu = () => setMenuOpen(false);
+  const openNavigation = (label: string) => {
+    setActiveMega((current) => current === label ? null : label);
+  };
 
   useEffect(() => {
     const aboutVisual = new window.Image();
@@ -27,11 +30,12 @@ export function GlobalHeader({ darkMode, onToggleDark }: Props) {
   return <header className="global-header" onMouseLeave={() => setActiveMega(null)}>
     <div className="global-container global-header-inner">
       <a className="global-logo" href="/" aria-label="Premier Bank home" onClick={closeMenu} style={{ marginLeft: 110 }}>
-        <Image src={darkMode ? "/images/darkmodelogo.png" : "/images/logo.png"} alt="Premier Bank" width={150} height={68} priority style={{ width: 92, height: "auto" }} />
+        <Image src={darkMode ? "/images/darkmodelogo.png" : "/images/logo.png"} alt="Premier Bank" width={150} height={68} priority style={{ width: 145, height: "auto" }} />
       </a>
       <nav className={menuOpen ? "global-nav is-open" : "global-nav"} aria-label="Primary navigation">
-        {navigation.map((item) => <button key={item.label} type="button" className="global-nav-mega-trigger" aria-expanded={activeMega === item.label} onMouseEnter={() => setActiveMega(item.label)} onClick={() => setActiveMega((current) => current === item.label ? null : item.label)}>{item.label}<ChevronDown size={14} /></button>)}
+        {navigation.map((item) => <button key={item.label} type="button" className="global-nav-mega-trigger" aria-expanded={activeMega === item.label} onMouseEnter={() => { if (window.innerWidth > 820) setActiveMega(item.label); }} onClick={() => openNavigation(item.label)}>{item.label}<ChevronDown size={14} /></button>)}
         <a className="global-branch-link" href="/branch-locator" onClick={closeMenu}><MapPin size={15} />Branch Locator</a>
+        <a className="global-mobile-online" href="https://online.premierbank.so/omni_corporate_web_portal/#/omni" onClick={closeMenu}><LogIn size={16} />Online Banking<ChevronDown size={14} /></a>
       </nav>
       <div className="global-header-actions">
         <button className="global-theme-toggle" onClick={onToggleDark} aria-label="Toggle dark mode">{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
