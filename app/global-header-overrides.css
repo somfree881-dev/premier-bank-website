@@ -17,11 +17,77 @@
   transform: none !important;
 }
 
+/* Balance the logo's existing left offset with equal room on the right. */
+.global-header-inner {
+  padding-right: 110px;
+}
+
+/* Keep the desktop navigation spacious without changing its visual design. */
+@media (min-width: 821px) {
+  .global-nav {
+    gap: clamp(20px, 1.7vw, 32px);
+    justify-content: space-between;
+  }
+
+  .global-nav-mega-trigger,
+  .global-nav .global-branch-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .global-header-actions {
+    gap: 16px;
+  }
+
+  .global-online-button {
+    white-space: nowrap;
+  }
+}
+
+/* Header action feedback only: keep the existing controls and colors intact. */
+.global-theme-toggle,
+.global-online-button {
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+.global-theme-toggle:hover {
+  transform: translateY(-2px) rotate(-8deg);
+  box-shadow: 0 8px 18px rgba(0, 46, 94, .14);
+}
+
+.global-online-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow: 0 9px 18px rgba(82, 126, 30, .22);
+}
+
+.global-online-button:hover svg:last-child {
+  animation: globalHeaderChevronNudge 520ms ease-in-out infinite alternate;
+}
+
+@keyframes globalHeaderChevronNudge {
+  to { transform: translateY(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-theme-toggle,
+  .global-online-button { transition: none; }
+  .global-online-button:hover svg:last-child { animation: none; }
+}
+
 .global-mobile-online {
   display: none !important;
 }
 
+.dark-site .global-menu-button {
+  color: #fff;
+}
+
 @media (max-width: 820px) {
+  .global-header-inner {
+    padding-right: 0;
+  }
+
   .global-logo {
     margin-left: 0 !important;
     width: auto;
