@@ -7,12 +7,18 @@ import { useEffect, useState } from "react";
 type Props = { darkMode: boolean; onToggleDark: () => void };
 
 const navigation = [
-  { label: "Personal Banking", href: "/#accounts", eyebrow: "Personal Banking", title: "Banking for everyday confidence.", description: "Flexible accounts, cards, financing and digital banking designed around your goals.", image: "/images/Premier-Wallet.png", items: ["Current Accounts", "Savings Accounts", "Salary Account", "Diaspora Banking Account", "Premier Mastercard", "Premier Wallet"] },
+  { label: "Personal Banking", href: "/#accounts", eyebrow: "Personal Banking", title: "Banking for everyday confidence.", description: "Flexible accounts, cards, financing and digital banking designed around your goals.", image: "/images/Premier-Wallet.png", items: ["Current Account", "Savings Account", "Salary Account", "Diaspora Banking Account", "Premier Mastercard", "Premier Wallet"] },
   { label: "Business Banking", href: "/#financing", eyebrow: "Business Banking", title: "Smarter solutions for growing businesses.", description: "Everyday banking, financing and payment tools that help your business operate with confidence.", image: "/images/businessbankingbanner.png", items: ["Business Current Account", "Corporate Current Account", "Business Financing", "Payroll Processing", "Premier POS", "Payment Gateway"] },
   { label: "International Banking", href: "/#banking-services", eyebrow: "International Banking", title: "Connect your finances to the world.", description: "Secure international banking solutions for individuals and businesses wherever opportunity takes you.", image: "/images/International Bankingbanner.png", items: ["SWIFT", "International Transfers", "Diaspora Banking", "Foreign Exchange", "International Payments"] },
   { label: "Services", href: "/#banking-services", eyebrow: "Our Services", title: "Everything you need to bank smarter.", description: "Modern digital, payment and everyday banking services in one place.", image: "/images/servicesbanner.png", items: ["Premier Wallet", "Online Banking", "Premier POS", "Payment Gateway", "Payroll", "ATM Banking", "Agency Banking", "SWIFT"] },
   { label: "About Us", href: "/#about", eyebrow: "About Premier Bank", title: "Building trust. Creating possibilities.", description: "Learn about the people, values and purpose behind Premier Bank.", image: "/images/logo.png", items: ["About Us", "Our Vision & Mission", "Core Values", "Leadership", "Careers", "CSR"] },
 ];
+
+function megaItemHref(entry: string, fallback: string) {
+  if (entry === "Diaspora Banking" || entry === "Diaspora Banking Account") return "/personal-banking/diaspora-banking";
+  if (entry === "Current Account") return "/personal-banking/current-account";
+  return fallback;
+}
 
 export function GlobalHeader({ darkMode, onToggleDark }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +51,7 @@ export function GlobalHeader({ darkMode, onToggleDark }: Props) {
     </div>
     {activeMega && <>
       <button type="button" className="global-mega-backdrop" aria-label="Close menu" onMouseEnter={() => setActiveMega(null)} onClick={() => setActiveMega(null)} />
-      {navigation.filter((item) => item.label === activeMega).map((item) => <section className="global-mega-menu" key={item.label}><div className="global-container global-mega-layout"><div className="global-mega-intro"><p>{item.eyebrow}</p><h2>{item.title}</h2><span>{item.description}</span><a href={item.href} onClick={() => setActiveMega(null)}>Explore {item.label}<ArrowRight size={16} /></a></div><div className="global-mega-links">{item.items.map((entry, index) => <a href={item.href} key={entry} onClick={() => setActiveMega(null)}><b>{String(index + 1).padStart(2, "0")}</b>{entry}<ArrowRight size={14} /></a>)}</div><div className={`global-mega-visual global-mega-visual-${item.label.toLowerCase().replaceAll(" ", "-")}`}><img src={item.image} alt="" width={330} height={245} loading="eager" decoding="async" /></div></div></section>)}
+      {navigation.filter((item) => item.label === activeMega).map((item) => <section className="global-mega-menu" key={item.label}><div className="global-container global-mega-layout"><button type="button" className="global-mobile-mega-close" aria-label="Close mega menu" onClick={() => setActiveMega(null)}><X size={18} /></button><div className="global-mega-intro"><p>{item.eyebrow}</p><h2>{item.title}</h2><span>{item.description}</span><a href={item.href} onClick={() => setActiveMega(null)}>Explore {item.label}<ArrowRight size={16} /></a></div><div className="global-mega-links">{item.items.map((entry, index) => <a href={megaItemHref(entry, item.href)} key={entry} onClick={() => setActiveMega(null)}><b>{String(index + 1).padStart(2, "0")}</b>{entry}<ArrowRight size={14} /></a>)}</div><div className={`global-mega-visual global-mega-visual-${item.label.toLowerCase().replaceAll(" ", "-")}`}><img src={item.image} alt="" width={330} height={245} loading="eager" decoding="async" /></div></div></section>)}
     </>}
   </header>;
 }
