@@ -1,5 +1,6 @@
 import { getLocalizedFallback, getRelevantPageLinks, getSecurityMessage, getVerifiedQuickAnswer } from "../../../lib/premier-knowledge";
 import { CHAT_LANGUAGE_NAMES, DEFAULT_CHAT_LANGUAGE, isChatLanguage } from "../../../lib/chat-languages";
+import type { ChatLanguage } from "../../../lib/chat-languages";
 import { getScopeResponse, isClarificationMessage } from "../../../lib/chat-scope";
 
 export const runtime = "nodejs";
@@ -98,7 +99,16 @@ function isLikelyContextualFollowUp(message: string, hasPriorAssistantReply: boo
   if (!hasPriorAssistantReply) return false;
   const normalized = message.toLocaleLowerCase().trim();
   if (normalized.length > 180) return false;
-  return /(?:maxaa faaido|faa.?ido|noocyad|faahfaahin|sideen|sidee|how|what about|what are|more details|tell me more|details|benefit|benefits|requirements|fee|fees|eligib|hii ni nini|je kuhusu|maelezo|nasıl|detay|更多|详情|ምን ጥቅም|ተጨማሪ)/i.test(normalized);
+  return /(?:maxaa faaido|faa.?ido|noocyad|faah\s*faahin|faahfaahi|ii\s*sharax|sharax|sii\s*wad|wax\s*badan|warbixin|iisii|maxaa\s*kale|wax\s*kale|sideen|sidee|how|what about|what are|more details|tell me more|explain more|more info|give me details|details please|details|benefit|benefits|requirements|fee|fees|eligib|hii ni nini|je kuhusu|maelezo|nasıl|detay|更多|详情|ምን ጥቅም|ተጨማሪ)/i.test(normalized);
+}
+
+function getChatLinks(message: string, language: ChatLanguage) {
+  const normalized = normalizeForContext(message);
+  if (/\b(?:haleel|hajj|umrah)\b/.test(normalized)) return [];
+  if (/(?:lacag (?:inten|intee|xagee|xage) kala bixi|xagee lacag kala bax|cash xagee kala bax|meel aan lacag kala baxo|withdraw xagee|atm lacag kala bixi|branch lacag kala bixi)/.test(normalized)) {
+    return [{ label: language === "so" ? "Fur Branch Locator" : "Open Branch Locator", href: "/branch-locator" }];
+  }
+  return getRelevantPageLinks(message, language);
 }
 
 function normalizeForContext(value: string) {
@@ -142,6 +152,20 @@ function resolveShortContextualQuestion(message: string, history: ChatMessage[])
   if (/^(?:haraag(?:eyga|ayga)?|balance(?: keyga)?) sidee?n? (?:u |loo )?araa\??$/.test(current) && !/\b(?:account|akoon|mobile banking)\b/.test(current)) {
     return "Premier Wallet balance only, not bank-account balance. Verified procedure: open Premier Wallet and select the closed-eye icon beside the masked asterisks. Answer only this procedure.";
   }
+
+  const asksWithdrawalLimit = /\b(?:maximum|max|limit|hal mar|xaddiga|intee le eg|meeqa)\b/.test(current) && /\b(?:withdraw|kala bax|bixi|atm|lacag)\b/.test(current);
+  if (asksWithdrawalLimit) return "Premier Bank withdrawal limit question. No exact verified ATM or cash-withdrawal limit is available. State this briefly and direct the customer to confirm with Premier Bank; do not invent an amount.";
+
+  const asksWithdrawalLocation = /(?:lacag (?:inten|intee|xagee|xage) kala bixi|xagee lacag kala bax|cash xagee kala bax|meel aan lacag kala baxo|withdraw xagee|atm lacag kala bixi|branch lacag kala bixi|teller lacag kala bixi|agent lacag kala bixi|lacag caddaan ah xagee)/.test(current);
+  if (asksWithdrawalLocation) return "Premier Bank verified cash-withdrawal locations: a nearby Premier Bank ATM, Premier Bank branch, or an available supported agent or teller. Ask for the customer's area only when identifying the nearest location. Include the verified Branch Locator link when available; do not invent a location or withdrawal limit.";
+
+  const mentionsExternalMobileMoney = /\b(?:evc|evc plus|evcplus|edahab|e dahab|jeeb|somnet|amtel|amtel cash|sahal|golis|telesom|zaad|mobile money)\b/.test(current);
+  if (mentionsExternalMobileMoney && /\b(?:shub|wareeji|account|wallet|premier|lacag)\b/.test(current)) return "External mobile-money funding guidance for Premier Bank: use an available agent or teller or contact a nearby Premier Bank branch for the supported funding method. Do not claim direct EVC Plus, eDahab, Jeeb, Amtel Cash, Sahal, Telesom or ZAAD integration; do not invent USSD codes, fees, limits or menu steps.";
+
+  const asksCashDeposit = /(?:cash (?:ayaan hayaa|baan hayaa|deposit|side u dhigaa)|lacag (?:side ugu shubtaa|side u dhigtaa|side account ugu shubaa|baan rabaa inaan dhigo|dhigasho)|account lacag ku shub|lacag wallet ku shub)/.test(current);
+  if (asksCashDeposit) return "Premier Bank verified cash-deposit guidance: cash may be deposited at a Premier Bank branch or at a nearby ATM that specifically supports Cash Deposit. At night, use an available Premier Bank ATM only if that specific ATM supports Cash Deposit; do not claim every ATM accepts deposits or is open 24/7.";
+
+  if (/\b(?:habeen|habeenkii|night)\b/.test(current) && /\b(?:atm|deposit|dhig|shub)\b/.test(current)) return "Premier Bank night cash-deposit guidance: a nearby ATM may be used only if that specific ATM supports Cash Deposit and is available. ATM services and location hours vary; do not guarantee all ATMs are 24/7 or accept deposits.";
 
   if (/^(?:account|akoon)$/.test(current) && /\b(?:transfer|lacag diri|money transfer|account to account)\b/.test(prior)) return "Personal Current Account supports Account-to-Account transfers through available digital-banking services. Give only this verified availability and state briefly that the exact access or menu procedure is not supplied; do not give a Mobile Banking balance procedure.";
   if (/^(?:wallet|qof)$/.test(current) && /\b(?:transfer|lacag diri|money transfer|wallet to wallet)\b/.test(prior)) return "Premier Wallet Wallet-to-Wallet Transfer Money verified procedure";
@@ -187,6 +211,18 @@ function resolveShortContextualQuestion(message: string, history: ChatMessage[])
     if (/\b(?:card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet digital-card details verified procedure: open Premier Wallet, select Mobile Banking, enter the four-digit PIN privately inside the app, select Card Management, choose the intended card, then select Show Digital Card or the eye icon.";
     if (/\b(?:account|akoon)\b/.test(prior)) return "Premier Wallet account-number lookup verified procedure: open Premier Wallet; use Withdraw or Transfer and view the name and account number below, or use Mobile Banking, enter the four-digit PIN privately inside the app, and view the name and account number.";
   }
+  const asksForMoreDetail = /^(?:faah faahin iga sii|faahfaahin iga sii|faahfaahi|ii faahfaahi|iisii faahfaahin|faahfaahin|faahfaahin buuxda|warbixin iga sii|wax badan iga sii|wax badan ii sheeg|wax badan iga sheeg|ii sharax|sharax|sii wad|maxaa kale|wax kale|tell me more|more details|explain more|more info|give me details|details please|details)$/.test(current);
+  if (asksForMoreDetail) {
+    if (/\b(?:haleel|hajj|umrah)\b/.test(prior)) return "haleel faahfaahin buuxda: Premier Bank and HUNSo partnership, full payment or minimum 30 percent initial payment, remaining balance within one year, interest-free and Sharia-compliant";
+    if (/\bpremier tap\b/.test(prior)) return "Premier Tap verified detailed information: contactless use, exactly five approved item types, availability caveats and no invented price or branch stock";
+    if (/\b(?:mastercard|master card|kaar)\b/.test(prior)) return "Premier Mastercard verified detailed information: supported uses, available card types, price only where verified, and no invented limits or eligibility";
+    if (/\b(?:wallet send|110 countr|110 dal|remittance)\b/.test(prior)) return "Premier Wallet Wallet Send verified detailed information: more than 110 countries, supported bank account mobile wallet or cash pickup methods, and no invented fee, rate, limit or delivery time";
+    if (/\b(?:account|akoon)\b/.test(prior)) return "Premier Bank account verified detailed information based on the recent account topic; do not invent fees, limits or undocumented procedures";
+    if (/\bpos\b/.test(prior)) return "Premier POS verified detailed information: supported cards, contactless payment, merchant flow and troubleshooting without invented limits or PIN thresholds";
+    if (/\b(?:cash deposit|lacag dhig|lacag shub|atm deposit)\b/.test(prior)) return "Premier Bank cash-deposit details: branch deposit and supported Cash Deposit ATM options, night availability caveat, and no claim that every ATM accepts deposits or operates 24/7";
+    if (/\b(?:cash withdrawal|lacag kala bax|withdrawal location|atm|agent|teller)\b/.test(prior)) return "Premier Bank cash-withdrawal location details: nearby supported ATM, branch, agent or teller; ask for the customer's area before identifying the nearest location and do not invent a limit";
+    if (/\b(?:evc|edahab|jeeb|amtel|sahal|telesom|zaad|mobile money)\b/.test(prior)) return "External mobile-money to Premier Bank funding guidance through an available agent, teller or branch without claiming direct integration, USSD code, fee or limit";
+  }
   if (/^(?:jaamacad|university)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet university Bill Payment verified procedure";
   if (/^(?:school|dugsi)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet supported school Bill Payment information";
   if (/^(?:government|dowlad)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet supported government Bill Payment information";
@@ -211,8 +247,11 @@ function resolveShortContextualQuestion(message: string, history: ChatMessage[])
   if (/^(adiga ma arki kartaa|ma arki kartaa|ii sheeg)$/.test(current) && /balance|haraag|balans/.test(prior)) return "wallet balance";
   if (/^(chatgpt|chat gpt)$/.test(current) && /mastercard|online/.test(prior)) return "chatgpt payment with premier virtual card";
   if (/^(kan lounge ma leeyahay|lounge ma leeyahay|kan faaido|faaido)$/.test(current) && /world elite/.test(prior)) return "world elite mastercard lounge benefits";
-  if (/^(faahfaahin iga sii|faahfaahin buuxda|wax badan iga sheeg|full details|explain more|sidee ayuu u shaqeeyaa)$/.test(current) && /haleel|hajj|umrah|xaj|cumro/.test(prior)) return "haleel faahfaahin buuxda";
-  if (/^(30|30 percent|30 boqolkiiba)$/.test(current) && /haleel|hajj|umrah|xaj|cumro/.test(prior)) return "haleel 30%";
+  if (/^(30|30 percent|30 boqolkiiba|30 maxay tahay)$/.test(current) && /haleel|hajj|umrah/.test(prior)) return "haleel 30% initial package payment";
+  if (/^(qayb qayb|qaybo|installment|instalment)$/.test(current) && /haleel|hajj|umrah/.test(prior)) return "haleel instalment arrangement: minimum 30 percent first and remaining balance within one year";
+  if (/^(muddo intee le eg|muddo|intee sano|how long)$/.test(current) && /haleel|hajj|umrah/.test(prior)) return "haleel payment period: remaining balance within one year";
+  if (/^(umrah|cumro)$/.test(current) && /haleel|hajj|umrah/.test(prior)) return "haleel detailed information in Umrah context";
+  if (/^(side ku helaa|sideen ku helaa|side loo helaa|how do i apply)$/.test(current) && /haleel|hajj|umrah/.test(prior)) return "haleel verified application guidance through Premier Bank or HUNSo without inventing requirements";
   if (/^(shuruudaha|shuruud|documents|dukumenti)$/.test(current) && /haleel|hajj|umrah|xaj|cumro/.test(prior)) return "haleel shuruudaha";
   return message;
 }
@@ -284,7 +323,7 @@ export async function POST(request: Request) {
   const normalizedMessage = normalizeForContext(message);
   if (/^(?:hajj|umrah|haleel)$/.test(normalizedMessage)) {
     const haleelAnswer = getVerifiedQuickAnswer(normalizedMessage, language);
-    if (haleelAnswer) return Response.json({ message: presentCustomerAnswer(haleelAnswer, message), links: getRelevantPageLinks(message, language) }, { headers: jsonHeaders });
+    if (haleelAnswer) return Response.json({ message: presentCustomerAnswer(haleelAnswer, message), links: getChatLinks(message, language) }, { headers: jsonHeaders });
   }
   const asksForUnqualifiedNumber = /^(?:number keyga|numberkayga|lambarkayga|lambarka keyga|my number)\??$/.test(normalizedMessage);
   if (asksForUnqualifiedNumber) {
@@ -295,7 +334,7 @@ export async function POST(request: Request) {
   }
   const contextualMessage = resolveShortContextualQuestion(message, history);
   const quickAnswer = shouldUseLocalQuickAnswer(contextualMessage) ? getVerifiedQuickAnswer(contextualMessage, language) : null;
-  const links = getRelevantPageLinks(message, language);
+  const links = getChatLinks(message, language);
   if (quickAnswer) return Response.json({ message: presentCustomerAnswer(quickAnswer, message), links }, { headers: jsonHeaders });
 
   const lastAssistantMessage = [...history].reverse().find((item) => item.role === "assistant")?.content;

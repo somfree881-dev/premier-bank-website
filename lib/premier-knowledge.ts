@@ -43,6 +43,7 @@ OFFICIAL PREMIER BANK FACEBOOK INFORMATION
 - Premier Wallet registration: download the app, choose Sign Up, enter mobile number, full name and an identification type such as National ID or Passport, verify the number using OTP, create a private PIN, and complete registration. Never ask a customer for an OTP or PIN.
 - Premier Wallet supports electricity bill payments: open Bill Payments, select the bill, enter the required bill/meter/account details, confirm the amount, and complete payment. Do not claim a specific electricity provider or identifier.
 - Official supplied content places Premier Bank ATMs at two Jabane Supermarket locations in Hargeisa. Mentioned ATM services include cash withdrawal, PIN change, balance inquiry and other ATM services. Ramadan announcement hours of 08:00 AM–04:00 PM are historical, not year-round current hours. Premier Bank ATM Cash Deposit was announced on 22.08.2024: supported ATMs can accept cash deposits in real time, securely and 24/7. Limits, note denominations, fees and supported locations are not supplied.
+- Cash-withdrawal location guidance: customers may use a nearby Premier Bank ATM, Premier Bank branch, or an available supported agent/teller. Do not identify the nearest location without the customer's area, and do not invent withdrawal limits. Cash deposits may be made through a Premier Bank branch or an ATM that specifically supports Cash Deposit; do not claim every ATM accepts deposits or that every location is available 24/7. At night, the customer may use a nearby available ATM only if that specific ATM supports Cash Deposit. If funds are held in an external mobile-money service such as EVC Plus, eDahab, Jeeb, Amtel Cash, Sahal, Telesom or ZAAD, direct the customer to an available agent/teller or Premier Bank branch for the supported funding method. Do not claim a direct mobile-money integration or invent a USSD code, menu, fee, limit or transfer procedure.
 - Premier Wallet supports Wallet-to-Wallet transfers through Transfer Money: choose the recipient, enter the amount, optionally choose Transaction Category, select Next, review the details and send. Merchant QR Code and Merchant ID belong to Merchant Payment through Pay, not Wallet-to-Wallet transfer. Premier Wallet also supports top-up, Wallet-to-Account transfers, deposits and withdrawals through supported services, balance checking, transaction history, exchange/currency conversion, and financial management. Do not invent recipient methods, limits, fees, currency-pair availability or undocumented steps.
 - Premier Wallet customer-support handling: customers can check their own balance and transaction history inside the Wallet, but the assistant cannot access balances, transaction status or account data. For a pending, failed or undelivered transfer, tell the customer to check the transaction status, avoid sending again before confirming the earlier transaction, retain the transaction reference if available, and contact Premier Bank. For login or MPIN issues, advise using the official recovery process or contacting Premier Bank; never request or accept an MPIN, PIN, OTP, password or CVV.
 - Wallet payment details: supported merchant payments may use a QR Code scan or Merchant ID. Wallet-to-Bank transfer is source-mentioned; Bank-to-Wallet steps are not verified and must be confirmed in the app or with Premier Bank. Agent and supported ATM deposit/withdrawal services are source-mentioned, but agent-specific steps and availability must be confirmed. Funding a Mastercard from the Wallet is not verified and must not be described as a confirmed process.
@@ -81,7 +82,7 @@ CARDS, SERVICES, AND FINANCING
 - Agency Banking helps customers access essential banking services through trusted agents close to them, including deposits, withdrawals, and banking needs beyond traditional banking hours.
 - The official POS page states that Premier POS is free inside Somalia. Do not infer fees for any other service. The official sources do not provide exchange rates, financing rates, card limits, approval decisions, or detailed policy terms.
 - Haleel is a joint Hajj and Umrah instalment-payment service from Premier Bank and Hajj, Umrah Network Somalia (HUNSo). It is intended for customers who cannot pay an entire Hajj or Umrah package at once.
-- User-provided official service information for Haleel states: pay at least 30% of the package price first, then pay the balance through an agreed instalment plan within one year. The financing is interest-free and described as Sharia-compliant. Package prices and monthly instalment amounts are not supplied and must be confirmed with Premier Bank or HUNSo.
+- User-provided official service information for Haleel states that a customer may pay the full selected package price at once, or pay at least 30% initially and pay the remaining balance through an agreed instalment plan within one year. The financing is interest-free and described as Sharia-compliant. Package prices and monthly instalment amounts are not supplied and must be confirmed with Premier Bank or HUNSo.
 - Haleel's Umrah availability is stated as Muharram through Ramadan in the Hijri calendar. Availability after Ramadan, package eligibility, and non-Somali passport acceptance must be confirmed with Premier Bank or HUNSo. Somali passport holders may apply according to the supplied service information.
 - To enquire about Haleel: contact Premier Bank or HUNSo, choose an available package, pay at least 30%, and sign the agreed instalment plan. The supplied timeline says the service idea began in November 2019, launched in January 2020, and was officially reopened on 23 December 2024.
 - Current Premier Bank senior management from the official management page: Dr. Mohamed Ghedi Jumale is Chief Executive Officer; Abdirashid Ali Adle is Head of Investment & Financing; Abdishakur Mohamed Afrah is Head of Corporate, SME and Retail; Mahad Ahmed Mohamed is Head of Operation; Abdinasir Hassan Ali is Head of IT; Mohamed Abdirahman Sheik is Head of Finance; Safia Abdi Abdullahi is Head of Risk & Compliance; Sayid Omar Ali Abubakar is Head of Internal Audit; Mohamed Ali Adam is Head of Digital Banking - Premier Wallet; and Isak Mohamed Ali is Head of Human Resources & Administration. The 2024 appointment information names Jibril Hassan as Chairman and states Dr. Ghedi succeeded Osman Duale Ahmed.
@@ -762,11 +763,11 @@ function isHaleelPriceQuestion(question: string) {
 }
 
 function isHaleelTermsQuestion(question: string) {
-  return isHaleelQuestion(question) && includesAny(question, ["30%", "30 percent", "boqolkiiba", "qaybo", "installment", "hadhaaga", "sanad", "muddo", "interest", "dulsaar", "ribo", "sharia", "sharia compliant"]);
+  return isHaleelQuestion(question) && !isHaleelDetailedRequest(question) && includesAny(question, ["30%", "30 percent", "boqolkiiba", "qaybo", "installment", "hadhaaga", "sanad", "muddo", "interest", "dulsaar", "ribo", "sharia", "sharia compliant"]);
 }
 
 function isHaleelDepositQuestion(question: string) {
-  return isHaleelQuestion(question) && /(?:^|\s)(?:30|30 percent|30 boqolkiiba)(?:\s|$)/i.test(normalizeQuestion(question));
+  return isHaleelQuestion(question) && !isHaleelDetailedRequest(question) && /(?:^|\s)(?:30|30 percent|30 boqolkiiba)(?:\s|$)/i.test(normalizeQuestion(question));
 }
 
 function isHaleelAvailabilityQuestion(question: string) {
@@ -818,8 +819,8 @@ function getSeniorManagementAnswer(question: string, language: ChatLanguage) {
 
 function getHaleelAnswer(question: string, language: ChatLanguage) {
   const conciseAnswer: Record<ChatLanguage, string> = {
-    so: "Haa, Premier Bank waxay bixisaa adeegga Haleel ee Xajka iyo Cumrada, kaas oo kuu sahlaaya inaad kharashka ku bixiso qaybo.",
-    en: "Yes, Premier Bank offers Haleel for Hajj and Umrah, helping customers pay the cost in instalments.",
+    so: "Premier Bank iyo HUNSo waxay bixiyaan adeegga Haleel oo loogu talagalay fududeynta Xajka iyo Cumrada. Adeeggu wuxuu kuu oggolaanayaa inaad kharashka bixiso hal mar ama qayb-qayb.",
+    en: "Premier Bank and HUNSo provide Haleel to make Hajj and Umrah costs easier to manage. Customers may pay the selected package in full or through the supported instalment arrangement.",
     sw: "Ndiyo, Premier Bank inatoa Haleel kwa Hajj na Umrah, inayokusaidia kulipa gharama kwa awamu.",
     am: "አዎ፣ Premier Bank ለሐጅና ለዑምራ Haleel አገልግሎት ይሰጣል፤ ወጪውን በክፍያ ክፍሎች እንዲከፍሉ ያግዛል።",
     zh: "是的，Premier Bank 提供面向朝觐和副朝的 Haleel 服务，帮助客户分期支付相关费用。",
@@ -833,8 +834,8 @@ function getHaleelAnswer(question: string, language: ChatLanguage) {
     ? "30% waa lacagta bilowga ah ee laga bixiyo qiimaha guud ee package-ka Haleel ee Xajka iyo Cumrada."
     : "30% is the initial payment toward the total Haleel package price for Hajj and Umrah.";
   if (isHaleelTermsQuestion(question)) return language === "so"
-    ? "Haleel waxaad marka hore bixinaysaa ugu yaraan 30% qiimaha guud ee package-ka. Hadhaaga waxaa lagu bixiyaa installments sida qorshaha lagu heshiiyay, muddo sanad gudaheed ah. Adeegga waxaa lagu sheegay inuu yahay mid aan dulsaar lahayn oo waafaqsan Shareecada Islaamka."
-    : "With Haleel, you pay at least 30% of the total package price first. The remaining balance is paid through the agreed instalment plan within one year. The service is described as interest-free and Sharia-compliant.";
+    ? "Haleel waxaad qiimaha package-ka oo dhan ku bixin kartaa hal mar, ama waxaad marka hore bixin kartaa ugu yaraan 30%. Hadhaaga waxaa lagu bixiyaa installments sida qorshaha lagu heshiiyay, muddo sanad gudaheed ah. Adeeggu waa mid aan dulsaar lahayn oo waafaqsan Shareecada Islaamka."
+    : "With Haleel, you may pay the full package price at once or pay at least 30% initially. The remaining balance is paid through the agreed instalment plan within one year. The service is interest-free and Sharia-compliant.";
   if (isHaleelAvailabilityQuestion(question)) return language === "so"
     ? "Adeegga Cumrada Haleel waxaa lagu sheegay inuu shaqeeyo bilaha Hijriga laga bilaabo Muharram ilaa Ramadan. Adeegga ka dambeeya Ramadan, sida Shawwal, fadlan ka xaqiiji Premier Bank ama HUNSo."
     : "Haleel's Umrah service is stated to operate during the Hijri months from Muharram through Ramadan. Please confirm availability after Ramadan, including Shawwal, with Premier Bank or HUNSo.";
@@ -845,8 +846,8 @@ function getHaleelAnswer(question: string, language: ChatLanguage) {
     ? "Shuruudaha Haleel waxaa ka mid noqon kara dukumentiyo aqoonsi iyo dukumentiyo safar. Faahfaahinta saxda ah fadlan nala soo xiriir."
     : "Haleel requirements may include identification and travel documents. Please contact us for the current exact requirements.";
   if (isHaleelDetailedRequest(question)) return language === "so"
-    ? "Haleel waa adeeg ay iska kaashadaan Premier Bank iyo HUNSo si Xajka iyo Cumrada loogu bixiyo qaybo. Waxaad bixinaysaa ugu yaraan 30% marka hore, hadhaagana installments ayaad ku bixinaysaa sida qorshaha lagu heshiiyay; adeegga waxaa lagu sheegay inuu yahay mid aan dulsaar lahayn."
-    : "Haleel is a Premier Bank and HUNSo partnership that lets customers pay for Hajj and Umrah in instalments. You pay at least 30% first, then pay the balance through the agreed instalment plan; the service is described as interest-free.";
+    ? "Haleel waa adeeg ay iska kaashadaan Premier Bank iyo HUNSo oo fududeynaya kharashaadka Xajka iyo Cumrada. Waxaad bixin kartaa lacagta oo dhan hal mar, ama ugu yaraan 30% qiimaha package-ka ayaad horudhac u bixin kartaa, inta hartayna qayb-qayb ayaad ku bixin kartaa muddo ilaa hal sano ah. Adeeggu waa mid aan dulsaar lahayn oo waafaqsan Shareecada."
+    : "Haleel is a Premier Bank and HUNSo partnership that helps customers manage Hajj and Umrah costs. You may pay in full or pay at least 30% initially and settle the remaining balance through instalments within one year. The service is interest-free and Sharia-compliant.";
   if (isHaleelApplicationQuestion(question)) return language === "so"
     ? "Si aad Haleel u hesho, la xiriir Premier Bank ama HUNSo, dooro package-ka la heli karo, bixi ugu yaraan 30%, kadibna saxiix qorshaha installment-ka lagu heshiiyay."
     : "To use Haleel, contact Premier Bank or HUNSo, choose an available package, pay at least 30%, then sign the agreed instalment plan.";
