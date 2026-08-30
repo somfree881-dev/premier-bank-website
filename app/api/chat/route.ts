@@ -85,6 +85,15 @@ const noKnowledgeMessages = {
   tr: "Bu ayrıntı şu anda erişebildiğim doğrulanmış bilgilerde yer almıyor. Doğru bilgi için lütfen Premier Bank ile iletişime geçin。",
 } as const;
 
+const numberClarificationMessages = {
+  so: "Ma account number-kaaga ayaad rabtaa mise card number-kaaga?",
+  en: "Do you need your account number or your card number?",
+  sw: "Unahitaji nambari ya akaunti au nambari ya kadi?",
+  am: "የሂሳብ ቁጥርዎን ወይስ የካርድ ቁጥርዎን ይፈልጋሉ?",
+  zh: "您需要查找账户号码还是银行卡号码？",
+  tr: "Hesap numaranızı mı yoksa kart numaranızı mı arıyorsunuz?",
+} as const;
+
 function isLikelyContextualFollowUp(message: string, hasPriorAssistantReply: boolean) {
   if (!hasPriorAssistantReply) return false;
   const normalized = message.toLocaleLowerCase().trim();
@@ -93,12 +102,36 @@ function isLikelyContextualFollowUp(message: string, hasPriorAssistantReply: boo
 }
 
 function normalizeForContext(value: string) {
-  return value.toLocaleLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLocaleLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^\s*\/\s*/, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b(?:premier tab|premier tapp|premiertab|premiertap|tap2pay|tap 2 pay)\b/g, "premier tap")
+    .replace(/\b(?:marchent|marchant)\b/g, "merchant")
+    .replace(/\b(?:taller|teler)\b/g, "teller")
+    .replace(/\b(?:harag|haraga|haraa)\b/g, "haraag")
+    .replace(/\bhalel\b/g, "haleel")
+    .replace(/\b(?:xaj|xajj|haj)\b/g, "hajj")
+    .replace(/\b(?:cumra|cumro)\b/g, "umrah");
 }
 
 function resolveShortContextualQuestion(message: string, history: ChatMessage[]) {
   const current = normalizeForContext(message);
   if (!current || current.length > 56) return message;
+  const prior = history.slice(-5).map((item) => normalizeForContext(item.content)).join(" ");
+
+  const asksForAccountNumber = /(?:\b(?:account|akoon)\b.*\b(?:number|no|lambar\p{L}*)\b)|(?:\b(?:number|no|lambar\p{L}*)\b.*\b(?:account|akoon)\b)/u.test(current);
+  const asksForCardNumber = /(?:\b(?:card|mastercard|kaar)\b.*\b(?:number|no|lambar\p{L}*)\b)|(?:\b(?:number|no|lambar\p{L}*)\b.*\b(?:card|mastercard|kaar)\b)/u.test(current);
+  if (asksForAccountNumber) {
+    return "Premier Wallet account-number lookup verified procedure only: open Premier Wallet; option one select Withdraw or Transfer and view the customer name and account number in the lower area; option two select Mobile Banking, enter the four-digit PIN privately inside the app, then view the customer name and account number. Answer with both options and begin with opening Premier Wallet.";
+  }
+  if (asksForCardNumber) {
+    return "Premier Wallet digital-card details verified procedure only: open Premier Wallet, select Mobile Banking, enter the four-digit PIN privately inside the app, select Card Management, choose the intended card, then select Show Digital Card or the eye icon. Never request or repeat the card number, CVV, PIN or OTP.";
+  }
 
   const isGeneralMoneyTransfer = /^(?:lacag sideen qof ugu diraa|side qof lacag ugu diraa|lacag diris|money transfer|side lacag loo diraa|qof lacag ma u diri karaa|transfer side loo sameeyaa)$/.test(current);
   const namesSpecificTransfer = /\b(?:wallet|account|akoon|international|dibad|dal kale|wallet send|top up|withdraw|ganacsi|merchant|pay)\b/.test(current);
@@ -110,10 +143,61 @@ function resolveShortContextualQuestion(message: string, history: ChatMessage[])
     return "Premier Wallet balance only, not bank-account balance. Verified procedure: open Premier Wallet and select the closed-eye icon beside the masked asterisks. Answer only this procedure.";
   }
 
-  if (history.length === 0) return message;
+  if (/^(?:account|akoon)$/.test(current) && /\b(?:transfer|lacag diri|money transfer|account to account)\b/.test(prior)) return "Personal Current Account supports Account-to-Account transfers through available digital-banking services. Give only this verified availability and state briefly that the exact access or menu procedure is not supplied; do not give a Mobile Banking balance procedure.";
+  if (/^(?:wallet|qof)$/.test(current) && /\b(?:transfer|lacag diri|money transfer|wallet to wallet)\b/.test(prior)) return "Premier Wallet Wallet-to-Wallet Transfer Money verified procedure";
+  if (/^(?:haraag|balance)$/.test(current) && /\b(?:account|akoon|mobile banking)\b/.test(prior)) return "Premier Wallet linked bank-account balance verified procedure through Mobile Banking and the eye icon";
 
-  const prior = history.slice(-4).map((item) => normalizeForContext(item.content)).join(" ");
+  const standaloneKeywordQueries: Record<string, string> = {
+    bill: "Premier Wallet Bill Payment verified overview and procedure",
+    billing: "Premier Wallet Bill Payment verified overview and procedure",
+    biil: "Premier Wallet Bill Payment verified overview and procedure",
+    biilka: "Premier Wallet Bill Payment verified overview and procedure",
+    biilal: "Premier Wallet Bill Payment verified overview and procedure",
+    card: "Premier Mastercard overview and Premier Wallet Card Management verified capabilities",
+    mastercard: "Premier Mastercard overview and Premier Wallet Card Management verified capabilities",
+    kaarka: "Premier Mastercard overview and Premier Wallet Card Management verified capabilities",
+    account: "Premier Wallet Mobile Banking linked bank-account overview",
+    akoon: "Premier Wallet Mobile Banking linked bank-account overview",
+    akoonkeyga: "Premier Wallet Mobile Banking linked bank-account overview",
+    accountkeyga: "Premier Wallet Mobile Banking linked bank-account overview",
+    hajj: "Haleel is the verified Premier Bank and HUNSo Hajj and Umrah interest-free Sharia-compliant instalment service: minimum 30 percent initial package payment and remaining balance within one year",
+    umrah: "Haleel is the verified Premier Bank and HUNSo Hajj and Umrah interest-free Sharia-compliant instalment service: minimum 30 percent initial package payment and remaining balance within one year; answer in Umrah context",
+    haleel: "Haleel is the verified Premier Bank and HUNSo Hajj and Umrah interest-free Sharia-compliant instalment service: minimum 30 percent initial package payment and remaining balance within one year",
+    haraag: "Premier Wallet balance verified procedure: open Premier Wallet and select the closed-eye icon beside the masked asterisks",
+    balance: "Premier Wallet balance verified procedure: open Premier Wallet and select the closed-eye icon beside the masked asterisks",
+    password: "Premier Wallet password verified overview: Change Password in Settings and Forget Password at login",
+    pass: "Premier Wallet password verified overview: Change Password in Settings and Forget Password at login",
+    lacag: "Premier Wallet money-service overview: person transfer, merchant payment, Top Up, Withdraw and Wallet Send",
+    money: "Premier Wallet money-service overview: person transfer, merchant payment, Top Up, Withdraw and Wallet Send",
+    swift: "Premier Bank SWIFT verified service information; never invent a SWIFT or BIC code",
+    transfer: "Premier Bank general money-transfer options: Wallet-to-Wallet, Account-to-Account and international Wallet Send",
+    teller: "Premier Wallet Cash Withdraw through teller verified procedure",
+    pos: "Premier POS verified overview including supported card and contactless payments",
+    "premier tap": "Premier Tap verified overview and exactly five approved item types",
+    tap: "Premier Tap verified overview and exactly five approved item types",
+    merchant: "Premier Wallet Merchant Payment verified procedure through Pay using merchant QR Code or Merchant ID",
+    ganacsi: "Premier Wallet Merchant Payment verified procedure through Pay using merchant QR Code or Merchant ID",
+  };
+  if (standaloneKeywordQueries[current]) return standaloneKeywordQueries[current];
+
+  if (history.length === 0) return message;
   if (!prior) return message;
+
+  if (/^(?:number keyga|numberkayga|lambarkayga|lambarka keyga|my number)$/.test(current)) {
+    if (/\b(?:card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet digital-card details verified procedure: open Premier Wallet, select Mobile Banking, enter the four-digit PIN privately inside the app, select Card Management, choose the intended card, then select Show Digital Card or the eye icon.";
+    if (/\b(?:account|akoon)\b/.test(prior)) return "Premier Wallet account-number lookup verified procedure: open Premier Wallet; use Withdraw or Transfer and view the name and account number below, or use Mobile Banking, enter the four-digit PIN privately inside the app, and view the name and account number.";
+  }
+  if (/^(?:jaamacad|university)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet university Bill Payment verified procedure";
+  if (/^(?:school|dugsi)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet supported school Bill Payment information";
+  if (/^(?:government|dowlad)$/.test(current) && /\b(?:bill|billing|biil|payment)\b/.test(prior)) return "Premier Wallet supported government Bill Payment information";
+  if (/^(?:number|number keyga|numberkayga)$/.test(current) && /\b(?:card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet digital-card details verified procedure through Mobile Banking and Card Management Show Digital Card";
+  if (/^(?:number|number keyga|numberkayga)$/.test(current) && /\b(?:account|akoon)\b/.test(prior)) return "Premier Wallet account-number lookup verified procedure through Withdraw or Transfer, or Mobile Banking";
+  if (/^(?:block|xir)$/.test(current) && /\b(?:card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet Card Management Block Card verified procedure";
+  if (/^(?:unblock|unlock|fur)$/.test(current) && /\b(?:card|mastercard|kaar|block)\b/.test(prior)) return "Premier Wallet Card Management Unblock Card verified procedure";
+  if (/^(?:delete|tirtir)$/.test(current) && /\b(?:card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet Card Management Delete Card verified procedure";
+  if (/^(?:change|badal|beddel)$/.test(current) && /\bpassword\b/.test(prior)) return "Premier Wallet Change Password verified procedure";
+  if (/^(?:change|badal|beddel)$/.test(current) && /\b(?:card pin|card|mastercard|kaar)\b/.test(prior)) return "Premier Wallet Card Management Change Card PIN verified procedure";
+  if (/^(?:dibada|international|110 dal)$/.test(current) && /\b(?:transfer|lacag dir|money transfer|wallet send)\b/.test(prior)) return "Premier Wallet Wallet Send international transfer to more than 110 countries verified information";
 
   if (["account", "account kale", "account buu leeyahay", "koonto", "koontada"].includes(current) && /wallet|lacag dir|transfer|qof kale/.test(prior)) return "wallet to bank account transfer";
   if (["qof kale", "wallet kale", "mid kale", "u dir", "transfer", "side diraa", "lacag ugu dir"].includes(current) && /wallet|transfer|lacag dir/.test(prior)) return "wallet to wallet transfer";
@@ -137,6 +221,7 @@ function shouldUseLocalQuickAnswer(message: string) {
   const normalized = normalizeForContext(message);
   return /^(?:asc|wcs|asalaamu alaikum|asalaamu calaykum|hi|hello|good morning|good afternoon|good evening|subax wanaagsan|galab wanaagsan|habeen wanaagsan|jambo|habari|merhaba|gunaydin|günaydın|你好|下午好|早上好|晚上好|ሰላም)(?:\s|$)/i.test(normalized)
     || /^(?:mahadsanid|waad mahadsan tahay|thank you|thanks|asante|bye|goodbye|nabad gelyo|kwa heri)(?:\s|$)/i.test(normalized)
+    || /\b(?:hajj|umrah|haleel)\b/i.test(normalized)
     || /(?:\b(?:m?pin|pin|password)\b.*\b(?:bedel|beddel|change|forgot|forget|illow|cusub)\b|\b(?:bedel|beddel|change|forgot|forget|illow|cusub)\b.*\b(?:m?pin|pin|password)\b)/i.test(normalized);
 }
 
@@ -196,6 +281,18 @@ export async function POST(request: Request) {
   }
 
   const history = cleanHistory(body.history);
+  const normalizedMessage = normalizeForContext(message);
+  if (/^(?:hajj|umrah|haleel)$/.test(normalizedMessage)) {
+    const haleelAnswer = getVerifiedQuickAnswer(normalizedMessage, language);
+    if (haleelAnswer) return Response.json({ message: presentCustomerAnswer(haleelAnswer, message), links: getRelevantPageLinks(message, language) }, { headers: jsonHeaders });
+  }
+  const asksForUnqualifiedNumber = /^(?:number keyga|numberkayga|lambarkayga|lambarka keyga|my number)\??$/.test(normalizedMessage);
+  if (asksForUnqualifiedNumber) {
+    const priorContext = history.slice(-4).map((item) => normalizeForContext(item.content)).join(" ");
+    if (!/\b(?:account|akoon|card|mastercard|kaar)\b/.test(priorContext)) {
+      return Response.json({ message: numberClarificationMessages[language], links: [] }, { headers: jsonHeaders });
+    }
+  }
   const contextualMessage = resolveShortContextualQuestion(message, history);
   const quickAnswer = shouldUseLocalQuickAnswer(contextualMessage) ? getVerifiedQuickAnswer(contextualMessage, language) : null;
   const links = getRelevantPageLinks(message, language);
