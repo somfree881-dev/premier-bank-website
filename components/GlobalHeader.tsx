@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 type Props = { darkMode: boolean; onToggleDark: () => void };
 
+// Header positioning is CSS-only so server and client markup remain identical.
+
 const navigation = [
   { label: "Personal Banking", href: "/#accounts", eyebrow: "Personal Banking", title: "Banking for everyday confidence.", description: "Flexible accounts, cards, financing and digital banking designed around your goals.", image: "/images/Premier-Wallet.png", items: ["Current Account", "Savings Account", "Salary Account", "Diaspora Banking Account", "Premier Mastercard", "Premier Wallet"] },
   { label: "Business Banking", href: "/#financing", eyebrow: "Business Banking", title: "Smarter solutions for growing businesses.", description: "Everyday banking, financing and payment tools that help your business operate with confidence.", image: "/images/businessbankingbanner.png", items: ["Business Current Account", "Corporate Current Account", "Business Financing", "Payroll Processing", "Premier POS", "Payment Gateway"] },
@@ -41,7 +43,7 @@ export function GlobalHeader({ darkMode, onToggleDark }: Props) {
       <nav className={menuOpen ? "global-nav is-open" : "global-nav"} aria-label="Primary navigation">
         {navigation.map((item) => <button key={item.label} type="button" className="global-nav-mega-trigger" aria-expanded={activeMega === item.label} onMouseEnter={() => { if (window.innerWidth > 820) setActiveMega(item.label); }} onClick={() => openNavigation(item.label)}>{item.label}<ChevronDown size={14} /></button>)}
         <a className="global-branch-link" href="/branch-locator" onClick={closeMenu}><MapPin size={15} />Branch Locator</a>
-        <a className="global-mobile-online" href="https://online.premierbank.so/omni_corporate_web_portal/#/omni" onClick={closeMenu}><LogIn size={16} />Online Banking<ChevronDown size={14} /></a>
+        <a className="global-mobile-online" href="https://online.premierbank.so/omni_corporate_web_portal/#/omni" onClick={closeMenu} style={{ display: "none" }}><LogIn size={16} />Online Banking<ChevronDown size={14} /></a>
       </nav>
       <div className="global-header-actions">
         <button className="global-theme-toggle" onClick={onToggleDark} aria-label="Toggle dark mode">{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>

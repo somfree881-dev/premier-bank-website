@@ -33,8 +33,38 @@ const allowedMarkdownExternalLinks = new Set([
   "https://online.premierbank.so/omni_corporate_web_portal/#/omni",
   "https://swiy.co/premierwallet",
   "https://hi.switchy.io/premierwallet",
+  "https://www.facebook.com/watch/?v=881086390235716",
+  "https://youtu.be/OkaOWVYy_4g",
+  "https://youtu.be/KflE753vFpg",
+  "https://www.facebook.com/share/v/1DXGZC5CE4/",
+  "https://www.facebook.com/share/v/1DSbDLeXvu/",
+  "https://www.facebook.com/share/v/18JViEjnWF/",
+  "https://www.facebook.com/share/v/17pjMzCPhr/",
+  "https://www.facebook.com/share/v/19G7eP5p85/",
+  "https://www.facebook.com/share/v/1BwqjbxrEV/",
+  "https://www.facebook.com/share/v/19KUg1zpGy/",
+  "https://www.facebook.com/share/r/1dJnXEv6Ts/",
+  "https://www.facebook.com/share/v/1Livpd5VTB/",
+  "https://www.facebook.com/share/v/18UqAk9oCk/",
+  "https://www.facebook.com/share/v/19cg57bjkn/",
+  "https://www.facebook.com/share/v/1GaFUNKXhW/",
+  "https://www.facebook.com/share/v/1Bnkmri5TU/",
+  "https://www.facebook.com/share/v/1EpmUhqFZa/",
+  "https://www.facebook.com/reel/1013761274916544",
+  "https://www.facebook.com/share/v/1NYQsjFhTq/",
+  "https://www.facebook.com/share/v/1DkX6DtfEE/",
+  "https://www.facebook.com/share/v/1GYSAQTjxS/",
+  "https://www.facebook.com/share/v/1FakpfdfYc/",
 ]);
-const markdownTokenPattern = /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\([^\s)]+\))/g;
+const allowedMarkdownExternalPrefixes = [
+  "https://www.premierbank.so/",
+  "https://www.facebook.com/premierbankso/",
+  "https://www.instagram.com/premierbankso/",
+  "https://twitter.com/premierbankSO",
+  "https://www.linkedin.com/company/premier-bank-so",
+  "https://www.youtube.com/channel/UCw3yoOilntIYZrqKR1uisKg",
+] as const;
+const markdownTokenPattern = /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\([^\s)]+\)|https:\/\/[^\s<]+)/g;
 const speechRecognitionLanguages: Record<ChatLanguage, string> = { so: "so-SO", en: "en-US", sw: "sw-KE", am: "am-ET", zh: "zh-CN", tr: "tr-TR" };
 const voiceErrors: Record<ChatLanguage, { permission: string; retry: string; unsupported: string }> = {
   so: { permission: "Fadlan oggolow isticmaalka makarafoonka si aad cod ugu weydiiso su'aashaada.", retry: "Fadlan mar kale isku day.", unsupported: "Voice input browser-kan kama taageerayo. Fadlan su'aashaada qor." },
@@ -46,7 +76,9 @@ const voiceErrors: Record<ChatLanguage, { permission: string; retry: string; uns
 };
 
 function isSafeMarkdownHref(href: string) {
-  return allowedChatLinks.has(href) || allowedMarkdownExternalLinks.has(href);
+  return allowedChatLinks.has(href)
+    || allowedMarkdownExternalLinks.has(href)
+    || allowedMarkdownExternalPrefixes.some((prefix) => href.startsWith(prefix));
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
@@ -60,7 +92,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
 
     if (token.startsWith("**")) {
       nodes.push(<strong key={`${keyPrefix}-bold-${start}`}>{token.slice(2, -2)}</strong>);
-    } else {
+    } else if (token.startsWith("[")) {
       const link = /^\[([^\]\n]+)\]\(([^\s)]+)\)$/.exec(token);
       if (link) {
         const [, label, href] = link;
@@ -70,6 +102,13 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       } else {
         nodes.push(token);
       }
+    } else {
+      const href = token.replace(/[.,;:!?]+$/, "");
+      const trailingText = token.slice(href.length);
+      nodes.push(isSafeMarkdownHref(href)
+        ? <a key={`${keyPrefix}-url-${start}`} href={href} target="_blank" rel="noreferrer">{href}</a>
+        : href);
+      if (trailingText) nodes.push(trailingText);
     }
     cursor = start + token.length;
   }
