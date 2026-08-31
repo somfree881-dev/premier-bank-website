@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot, ChevronDown, Globe2, MessageCircle, Mic, Send, Sparkles, X } from "lucide-react";
+import Image from "next/image";
+import { ChevronDown, Globe2, Mic, Send, X } from "lucide-react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { CHAT_LANGUAGES, DEFAULT_CHAT_LANGUAGE, type ChatLanguage } from "../lib/chat-languages";
 
@@ -16,6 +17,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   maxAlternatives: number;
   start: () => void;
+  stop: () => void;
   abort: () => void;
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
@@ -66,13 +68,14 @@ const allowedMarkdownExternalPrefixes = [
 ] as const;
 const markdownTokenPattern = /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\([^\s)]+\)|https:\/\/[^\s<]+)/g;
 const speechRecognitionLanguages: Record<ChatLanguage, string> = { so: "so-SO", en: "en-US", sw: "sw-KE", am: "am-ET", zh: "zh-CN", tr: "tr-TR" };
-const voiceErrors: Record<ChatLanguage, { permission: string; retry: string; unsupported: string }> = {
-  so: { permission: "Fadlan oggolow isticmaalka makarafoonka si aad cod ugu weydiiso su'aashaada.", retry: "Fadlan mar kale isku day.", unsupported: "Voice input browser-kan kama taageerayo. Fadlan su'aashaada qor." },
-  en: { permission: "Please allow microphone access to ask your question by voice.", retry: "Please try again.", unsupported: "Voice input is not supported by this browser. Please type your question." },
-  sw: { permission: "Tafadhali ruhusu matumizi ya maikrofoni ili kuuliza swali lako kwa sauti.", retry: "Tafadhali jaribu tena.", unsupported: "Uingizaji wa sauti hautumiki kwenye kivinjari hiki. Tafadhali andika swali lako." },
-  am: { permission: "ጥያቄዎን በድምጽ ለመጠየቅ የማይክሮፎን ፈቃድ ይስጡ።", retry: "እባክዎ እንደገና ይሞክሩ።", unsupported: "ይህ አሳሽ የድምጽ ግቤትን አይደግፍም። እባክዎ ጥያቄዎን ይጻፉ።" },
-  zh: { permission: "请允许使用麦克风，以便通过语音提问。", retry: "请重试。", unsupported: "此浏览器不支持语音输入，请输入您的问题。" },
-  tr: { permission: "Sorunuzu sesli sormak için lütfen mikrofon erişimine izin verin.", retry: "Lütfen tekrar deneyin.", unsupported: "Bu tarayıcı sesli girişi desteklemiyor. Lütfen sorunuzu yazın." },
+type VoiceMessages = { permission: string; unsupported: string; noSpeech: string; audioCapture: string; network: string; service: string; recognition: string; listening: string };
+const voiceErrors: Record<ChatLanguage, VoiceMessages> = {
+  so: { permission: "Fadlan oggolow isticmaalka makarafoonka.", unsupported: "Cod-gelinta browser-kan lagama taageero. Fadlan qoraal ku qor fariintaada.", noSpeech: "Wax hadal ah lama maqal. Fadlan mar kale isku day.", audioCapture: "Makarafoonka cod lagama heli karo. Hubi inuu diyaar yahay, kadib mar kale isku day.", network: "Cod-gelintu hadda ma shaqaynayso. Fadlan mar kale isku day ama qoraal ku qor.", service: "Adeegga cod-aqoonsiga browser-kan hadda lama heli karo. Fadlan qoraal ku qor fariintaada.", recognition: "Codka lama aqoonsan. Fadlan mar kale isku day.", listening: "Codkaaga waa la dhageysanayaa" },
+  en: { permission: "Please allow microphone access.", unsupported: "Voice input is not supported by this browser. Please type your message.", noSpeech: "No speech was heard. Please try again.", audioCapture: "The microphone could not capture audio. Check that it is available and try again.", network: "Voice input is currently unavailable. Please try again or type your message.", service: "This browser's speech-recognition service is currently unavailable. Please type your message.", recognition: "Your speech could not be recognized. Please try again.", listening: "Listening" },
+  sw: { permission: "Tafadhali ruhusu matumizi ya maikrofoni.", unsupported: "Uingizaji wa sauti hautumiki kwenye kivinjari hiki. Tafadhali andika ujumbe wako.", noSpeech: "Hakuna sauti iliyosikika. Tafadhali jaribu tena.", audioCapture: "Maikrofoni haikuweza kunasa sauti. Hakikisha inapatikana kisha ujaribu tena.", network: "Uingizaji wa sauti haupatikani sasa. Jaribu tena au andika ujumbe wako.", service: "Huduma ya utambuzi wa sauti ya kivinjari hiki haipatikani sasa. Tafadhali andika ujumbe wako.", recognition: "Sauti haikutambuliwa. Tafadhali jaribu tena.", listening: "Inasikiliza" },
+  am: { permission: "እባክዎ የማይክሮፎን ፈቃድ ይስጡ።", unsupported: "ይህ አሳሽ የድምጽ ግቤትን አይደግፍም። እባክዎ መልዕክትዎን ይጻፉ።", noSpeech: "ምንም ድምጽ አልተሰማም። እባክዎ እንደገና ይሞክሩ።", audioCapture: "ማይክሮፎኑ ድምጽ መቅረጽ አልቻለም። መገኘቱን ያረጋግጡና እንደገና ይሞክሩ።", network: "የድምጽ ግቤት አሁን አይሰራም። እንደገና ይሞክሩ ወይም መልዕክትዎን ይጻፉ።", service: "የዚህ አሳሽ የድምጽ ማወቂያ አገልግሎት አሁን አይገኝም። እባክዎ መልዕክትዎን ይጻፉ።", recognition: "ድምጹ አልታወቀም። እባክዎ እንደገና ይሞክሩ።", listening: "በማዳመጥ ላይ" },
+  zh: { permission: "请允许使用麦克风。", unsupported: "此浏览器不支持语音输入，请输入您的消息。", noSpeech: "未听到语音，请重试。", audioCapture: "麦克风无法采集音频，请检查后重试。", network: "语音输入当前不可用，请重试或输入消息。", service: "此浏览器的语音识别服务当前不可用，请输入消息。", recognition: "无法识别语音，请重试。", listening: "正在聆听" },
+  tr: { permission: "Lütfen mikrofon erişimine izin verin.", unsupported: "Bu tarayıcı sesli girişi desteklemiyor. Lütfen mesajınızı yazın.", noSpeech: "Herhangi bir konuşma duyulmadı. Lütfen tekrar deneyin.", audioCapture: "Mikrofon ses yakalayamadı. Kullanılabilir olduğunu kontrol edip tekrar deneyin.", network: "Sesli giriş şu anda kullanılamıyor. Tekrar deneyin veya mesajınızı yazın.", service: "Bu tarayıcının konuşma tanıma hizmeti şu anda kullanılamıyor. Lütfen mesajınızı yazın.", recognition: "Konuşma tanınamadı. Lütfen tekrar deneyin.", listening: "Dinleniyor" },
 };
 
 function isSafeMarkdownHref(href: string) {
@@ -211,6 +214,10 @@ export function PremierChatbot() {
   const lastUserMessageRef = useRef(0);
   const nextMessageIdRef = useRef(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceStartInProgressRef = useRef(false);
+  const voiceSessionRef = useRef(0);
+  const mountedRef = useRef(true);
+  const microphonePermissionRef = useRef<PermissionState | "unknown">("unknown");
 
   function nextMessageId() {
     const id = Math.max(Date.now(), nextMessageIdRef.current + 1);
@@ -285,21 +292,55 @@ export function PremierChatbot() {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isSending]);
 
-  useEffect(() => () => recognitionRef.current?.abort(), []);
+  useEffect(() => {
+    const permissionsApi = navigator.permissions as (Permissions & { query: (descriptor: PermissionDescriptor | { name: "microphone" }) => Promise<PermissionStatus> }) | undefined;
+    if (!permissionsApi?.query) return;
+    void permissionsApi.query({ name: "microphone" }).then((permission) => {
+      microphonePermissionRef.current = permission.state;
+    }).catch(() => {
+      microphonePermissionRef.current = "unknown";
+    });
+  }, []);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    voiceSessionRef.current += 1;
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try { recognition.abort(); } catch { /* Recognition may already be closed. */ }
+    }
+  }, []);
 
   function stopVoiceRecognition() {
-    recognitionRef.current?.abort();
+    voiceSessionRef.current += 1;
+    voiceStartInProgressRef.current = false;
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try { recognition.stop(); } catch {
+        try { recognition.abort(); } catch { /* Recognition may already be closed. */ }
+      }
+    }
     setIsListening(false);
   }
 
-  function startVoiceRecognition() {
+  async function startVoiceRecognition() {
     if (isSending) return;
-    if (isListening) {
+    if (isListening || recognitionRef.current || voiceStartInProgressRef.current) {
       stopVoiceRecognition();
       return;
     }
 
+    setError("");
     const recognitionApi = (window as typeof window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor }).SpeechRecognition
       ?? (window as typeof window & { webkitSpeechRecognition?: SpeechRecognitionConstructor }).webkitSpeechRecognition;
     if (!recognitionApi) {
@@ -307,42 +348,91 @@ export function PremierChatbot() {
       return;
     }
 
-    const recognition = new recognitionApi();
-    recognitionRef.current = recognition;
-    recognition.lang = speechRecognitionLanguages[language];
-    recognition.interimResults = false;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
-      setError("");
-      setIsListening(true);
-    };
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .slice(event.resultIndex)
-        .filter((result) => result.isFinal)
-        .map((result) => result[0]?.transcript.trim())
-        .filter(Boolean)
-        .join(" ");
-      if (transcript) {
-        setInput(transcript.slice(0, 900));
-        requestAnimationFrame(() => inputRef.current?.focus());
-      }
-    };
-    recognition.onerror = (event) => {
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") setError(voiceErrors[language].permission);
-      else if (event.error !== "aborted") setError(voiceErrors[language].retry);
-    };
-    recognition.onend = () => {
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
-      setIsListening(false);
-    };
+    const session = ++voiceSessionRef.current;
+    voiceStartInProgressRef.current = true;
+    let microphoneGranted = microphonePermissionRef.current === "granted";
+
     try {
+      const permissionsApi = navigator.permissions as (Permissions & { query: (descriptor: PermissionDescriptor | { name: "microphone" }) => Promise<PermissionStatus> }) | undefined;
+      if (microphonePermissionRef.current === "denied") {
+        setError(voiceErrors[language].permission);
+        return;
+      }
+      if (microphonePermissionRef.current === "unknown" && permissionsApi?.query) {
+        try {
+          const permission = await permissionsApi.query({ name: "microphone" });
+          microphonePermissionRef.current = permission.state;
+          if (permission.state === "denied") {
+            if (mountedRef.current && session === voiceSessionRef.current) setError(voiceErrors[language].permission);
+            return;
+          }
+          microphoneGranted = permission.state === "granted";
+        } catch {
+          // Safari and some mobile browsers do not expose microphone permission queries.
+        }
+      }
+
+      if (!microphoneGranted && navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+          microphoneGranted = true;
+          microphonePermissionRef.current = "granted";
+        } catch (mediaError) {
+          const name = mediaError instanceof DOMException ? mediaError.name : "";
+          if (name === "NotAllowedError" || name === "SecurityError") microphonePermissionRef.current = "denied";
+          if (mountedRef.current && session === voiceSessionRef.current) {
+            setError(name === "NotAllowedError" || name === "SecurityError" ? voiceErrors[language].permission : voiceErrors[language].audioCapture);
+          }
+          return;
+        }
+      }
+
+      if (!mountedRef.current || session !== voiceSessionRef.current) return;
+
+      const recognition = new recognitionApi();
+      recognitionRef.current = recognition;
+      recognition.lang = speechRecognitionLanguages[language];
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+      const originalInput = input.trim();
+      recognition.onstart = () => {
+        if (!mountedRef.current || recognitionRef.current !== recognition) return;
+        setError("");
+        setIsListening(true);
+      };
+      recognition.onresult = (event) => {
+        if (!mountedRef.current || recognitionRef.current !== recognition) return;
+        const transcript = Array.from(event.results).map((result) => result[0]?.transcript.trim()).filter(Boolean).join(" ");
+        if (transcript) {
+          setInput([originalInput, transcript].filter(Boolean).join(" ").slice(0, 900));
+          requestAnimationFrame(() => inputRef.current?.focus());
+        }
+      };
+      recognition.onerror = (event) => {
+        if (!mountedRef.current || recognitionRef.current !== recognition || event.error === "aborted") return;
+        if (event.error === "not-allowed") setError(microphoneGranted ? voiceErrors[language].service : voiceErrors[language].permission);
+        else if (event.error === "service-not-allowed" || event.error === "language-not-supported") setError(voiceErrors[language].service);
+        else if (event.error === "no-speech") setError(voiceErrors[language].noSpeech);
+        else if (event.error === "audio-capture") setError(voiceErrors[language].audioCapture);
+        else if (event.error === "network") setError(voiceErrors[language].network);
+        else setError(voiceErrors[language].recognition);
+      };
+      recognition.onend = () => {
+        if (!mountedRef.current) return;
+        if (recognitionRef.current === recognition) recognitionRef.current = null;
+        setIsListening(false);
+      };
       recognition.start();
     } catch {
       recognitionRef.current = null;
-      setIsListening(false);
-      setError(voiceErrors[language].retry);
+      if (mountedRef.current && session === voiceSessionRef.current) {
+        setIsListening(false);
+        setError(voiceErrors[language].recognition);
+      }
+    } finally {
+      voiceStartInProgressRef.current = false;
     }
   }
 
@@ -402,29 +492,29 @@ export function PremierChatbot() {
   return <aside className={`premier-chatbot${isDark ? " is-dark" : ""}${open ? " is-open" : ""}`} aria-label="Premier Bank digital assistant">
     {open && <section className="premier-chat-window" aria-label="Chat with Premier Bank">
       <header className="premier-chat-header">
-        <div className="premier-chat-brand"><span><Bot size={19} /></span><div><b>Premier Bank Assistant</b><small><i />Online - Informational support</small></div></div>
+        <div className="premier-chat-brand"><span><Image className="premier-chat-brand-icon" src="/images/iconlogo.png" alt="Premier Bank" width={27} height={27} /></span><div><b>Premier Bank Assistant</b><small><i />Online - Informational support</small></div></div>
         <div className="premier-chat-actions">
-          <label className="premier-chat-language"><Globe2 size={14} /><span>Language</span><select value={language} onChange={(event) => setLanguage(event.target.value as ChatLanguage)} aria-label="Chat language">{CHAT_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+          <label className="premier-chat-language"><Globe2 size={14} /><span>Language</span><select value={language} onChange={(event) => { stopVoiceRecognition(); setLanguage(event.target.value as ChatLanguage); }} aria-label="Chat language">{CHAT_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
           <button type="button" onClick={() => { stopVoiceRecognition(); setOpen(false); }} aria-label="Close chat"><X size={19} /></button>
         </div>
       </header>
       <div className="premier-chat-messages" ref={messagesRef} aria-live="polite">
-        {messages.map((message) => <div className={`premier-chat-message ${message.role}`} key={message.id}>{message.role === "assistant" && <Bot size={15} />}<div>{message.role === "assistant" ? <div className="premier-chat-markdown">{renderMarkdown(message.content)}</div> : <p>{message.content}</p>}{message.links?.map((link) => <a className="premier-chat-page-link" href={link.href} key={link.href}>{link.label}</a>)}</div></div>)}
+        {messages.map((message) => <div className={`premier-chat-message ${message.role}`} key={message.id}>{message.role === "assistant" && <Image className="premier-chat-message-avatar" src="/images/iconlogo.png" alt="Premier Bank" width={24} height={24} />}<div>{message.role === "assistant" ? <div className="premier-chat-markdown">{renderMarkdown(message.content)}</div> : <p>{message.content}</p>}{message.links?.map((link) => <a className="premier-chat-page-link" href={link.href} key={link.href}>{link.label}</a>)}</div></div>)}
         {isSending && <div className="premier-chat-typing" aria-label="Assistant is typing"><i /><i /><i /></div>}
         {messages.length === 1 && <div className="premier-chat-suggestions"><span>Suggested questions</span>{suggestions[language].map((suggestion) => <button type="button" key={suggestion} onClick={() => void sendMessage(suggestion)}>{suggestion}<ChevronDown size={14} /></button>)}</div>}
         {error && <p className="premier-chat-error" role="alert">{error}</p>}
       </div>
       <form className="premier-chat-input" onSubmit={submit}>
-        <button className={`premier-chat-mic${isListening ? " is-listening" : ""}`} type="button" onClick={startVoiceRecognition} disabled={isSending} aria-label={isListening ? "Stop voice input" : "Ask by voice"} aria-pressed={isListening} title={isListening ? "Stop listening" : "Ask by voice"}><Mic size={17} /></button>
+        <button className={`premier-chat-mic${isListening ? " is-listening" : ""}`} type="button" onClick={() => void startVoiceRecognition()} disabled={isSending} aria-label={isListening ? voiceErrors[language].listening : "Ask by voice"} aria-pressed={isListening} title={isListening ? voiceErrors[language].listening : "Ask by voice"}><Mic size={17} /></button>
         <input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} maxLength={900} placeholder="Ask a Premier Bank question..." aria-label="Message Premier Bank assistant" disabled={isSending} />
         <button type="submit" disabled={!input.trim() || isSending} aria-label="Send message"><Send size={17} /></button>
       </form>
-      <p className="premier-chat-notice"><Sparkles size={12} />For general information only. Never share PINs, passwords, OTPs, or card details.</p>
+      <p className="premier-chat-notice">For general information only. Never share PINs, passwords, OTPs, or card details.</p>
     </section>}
     <button type="button" className="premier-chat-launcher" onClick={() => { if (open) stopVoiceRecognition(); setOpen((value) => !value); }} aria-label={open ? "Close Premier Bank assistant" : "Open Premier Bank assistant"} aria-expanded={open}>
-      {open ? <X size={23} /> : <MessageCircle size={23} />}<span>{open ? "Close" : "Chat with us"}</span>
+      {open ? <X size={23} /> : <Image className="premier-chat-launcher-logo" src="/images/iconlogo.png" alt="Premier Bank" width={26} height={26} />}<span>{open ? "Close" : "Chat with us"}</span>
     </button>
     <style>{`.premier-chatbot{position:fixed;z-index:2200;right:22px;bottom:22px;font-family:Poppins,Arial,sans-serif}.premier-chat-launcher{display:flex;align-items:center;gap:10px;border:0;border-radius:999px;padding:14px 18px;background:#002e5e;color:#fff;font:800 13px Poppins,Arial,sans-serif;box-shadow:0 13px 27px rgba(0,46,94,.28);cursor:pointer;transition:transform .25s ease,box-shadow .25s ease,background .25s ease}.premier-chat-launcher:hover{transform:translateY(-4px) scale(1.025);background:#093f73;box-shadow:0 20px 32px rgba(0,46,94,.38)}.premier-chat-launcher svg{color:#b5e168}.premier-chat-window{position:absolute;right:0;bottom:62px;display:flex;flex-direction:column;width:min(390px,calc(100vw - 32px));height:min(590px,calc(100vh - 116px));overflow:hidden;border:1px solid #d7e5e7;border-radius:20px;background:#f8fcfd;box-shadow:0 25px 60px rgba(0,31,64,.26);animation:premierChatOpen .28s cubic-bezier(.2,.8,.2,1) both}.premier-chat-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 17px 16px;background:linear-gradient(120deg,#002e5e,#0b5267);color:#fff}.premier-chat-header>div{display:flex;align-items:center;gap:10px}.premier-chat-header>div>span{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:rgba(179,225,104,.16);color:#b5e168}.premier-chat-header b,.premier-chat-header small{display:block}.premier-chat-header b{font-size:13px}.premier-chat-header small{margin-top:2px;color:#d4e4ea;font-size:9px}.premier-chat-header small i{display:inline-block;width:6px;height:6px;margin-right:4px;border-radius:50%;background:#aadd65}.premier-chat-header button{display:grid;place-items:center;width:32px;height:32px;border:1px solid rgba(255,255,255,.2);border-radius:9px;background:transparent;color:#fff;cursor:pointer;transition:.2s}.premier-chat-header button:hover{background:rgba(255,255,255,.13)}.premier-chat-messages{flex:1;overflow-y:auto;padding:17px 14px;background:linear-gradient(145deg,#f8fcfd,#f2faed)}.premier-chat-message{display:flex;align-items:flex-end;gap:7px;margin:0 0 12px;animation:premierChatMessage .24s ease both}.premier-chat-message>svg{flex:none;margin-bottom:4px;color:#74aa35}.premier-chat-message p,.premier-chat-markdown{max-width:83%;margin:0;padding:11px 12px;border-radius:13px 13px 13px 3px;background:#fff;box-shadow:0 5px 13px rgba(0,46,94,.07);color:#36566f;font-size:12px;line-height:1.55;white-space:pre-wrap}.premier-chat-markdown{white-space:normal}.premier-chat-markdown p{max-width:none;margin:0;padding:0;border-radius:0;background:transparent;box-shadow:none;color:inherit;font:inherit;line-height:inherit;white-space:normal}.premier-chat-markdown p+p{margin-top:8px}.premier-chat-markdown strong{font-weight:800;color:inherit}.premier-chat-markdown a{color:#4e8120;font-weight:800;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}.premier-chat-markdown a:hover{color:#002e5e}.premier-chat-markdown-list{margin:7px 0 0;padding-left:18px}.premier-chat-markdown-list li+li{margin-top:3px}.premier-chat-markdown-heading{margin-bottom:4px!important;font-weight:800!important;line-height:1.35!important}.premier-chat-markdown-heading.level-1{font-size:14px!important}.premier-chat-markdown-heading.level-2{font-size:13px!important}.premier-chat-markdown-heading.level-3{font-size:12px!important}.premier-chat-message.user{justify-content:flex-end}.premier-chat-message.user p{border-radius:13px 13px 3px 13px;background:#002e5e;color:#fff}.premier-chat-suggestions{display:grid;gap:7px;margin:4px 0 12px}.premier-chat-suggestions>span{margin:3px 0 2px;color:#6e8798;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}.premier-chat-suggestions button{display:flex;align-items:center;justify-content:space-between;gap:9px;border:1px solid #d7e8d5;border-radius:9px;padding:9px 10px;background:#fff;color:#315570;font:600 11px Poppins,Arial,sans-serif;text-align:left;cursor:pointer;transition:.2s}.premier-chat-suggestions button:hover{transform:translateX(3px);border-color:#93c748;background:#f4faec;color:#527d1e}.premier-chat-suggestions button svg{transform:rotate(-90deg);color:#7dab38}.premier-chat-typing{display:flex;align-items:center;gap:4px;width:max-content;margin:0 0 12px 22px;padding:11px 13px;border-radius:12px;background:#fff;box-shadow:0 5px 13px rgba(0,46,94,.07)}.premier-chat-typing i{width:5px;height:5px;border-radius:50%;background:#78aa36;animation:premierChatDot .8s ease-in-out infinite}.premier-chat-typing i:nth-child(2){animation-delay:.13s}.premier-chat-typing i:nth-child(3){animation-delay:.26s}.premier-chat-error{margin:4px 0 12px;padding:10px;border:1px solid #f3c5c5;border-radius:9px;background:#fff4f4;color:#a83737;font-size:11px;line-height:1.5}.premier-chat-input{display:flex;gap:8px;padding:12px;border-top:1px solid #dce8e9;background:#fff}.premier-chat-input input{min-width:0;flex:1;border:1px solid #d7e4e7;border-radius:10px;padding:10px 11px;outline:0;background:#f8fbfc;color:#173b5c;font:500 12px Poppins,Arial,sans-serif}.premier-chat-input input:focus{border-color:#93c748;box-shadow:0 0 0 3px rgba(147,199,72,.14)}.premier-chat-input button{display:grid;place-items:center;flex:none;width:41px;border:0;border-radius:10px;background:#93c748;color:#173622;cursor:pointer;transition:.2s}.premier-chat-input button:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.04)}.premier-chat-input button:disabled{cursor:not-allowed;opacity:.5}.premier-chat-mic{border:1px solid #d7e4e7!important;background:#f4faec!important;color:#527d1e!important}.premier-chat-mic.is-listening{border-color:#93c748!important;background:#e3f5c8!important;animation:premierChatMic 1.1s ease-in-out infinite}.premier-chat-notice{display:flex;align-items:center;justify-content:center;gap:5px;margin:0;padding:8px 12px;background:#f4faec;color:#698393;font-size:9px;text-align:center;line-height:1.35}.premier-chat-notice svg{color:#77aa35}.premier-chatbot.is-dark .premier-chat-window{border-color:#25546e;background:#082943;box-shadow:0 25px 60px rgba(0,3,14,.48)}.premier-chatbot.is-dark .premier-chat-messages{background:linear-gradient(145deg,#082943,#0b3751)}.premier-chatbot.is-dark .premier-chat-message p,.premier-chatbot.is-dark .premier-chat-markdown,.premier-chatbot.is-dark .premier-chat-suggestions button,.premier-chatbot.is-dark .premier-chat-typing,.premier-chatbot.is-dark .premier-chat-input{background:#103b58;color:#dcebf3}.premier-chatbot.is-dark .premier-chat-markdown p{background:transparent;color:inherit}.premier-chatbot.is-dark .premier-chat-markdown a{color:#b5e168}.premier-chatbot.is-dark .premier-chat-message.user p{background:#93c748;color:#173622}.premier-chatbot.is-dark .premier-chat-suggestions button{border-color:#285b73}.premier-chatbot.is-dark .premier-chat-input{border-color:#25546e}.premier-chatbot.is-dark .premier-chat-input input{border-color:#285b73;background:#092c46;color:#fff}.premier-chatbot.is-dark .premier-chat-mic{border-color:#35647d!important;background:#0a314d!important;color:#b5e168!important}.premier-chatbot.is-dark .premier-chat-mic.is-listening{border-color:#b5e168!important;background:#164d50!important}.premier-chatbot.is-dark .premier-chat-notice{background:#0a314d;color:#b8cedb}.premier-chatbot.is-dark .premier-chat-error{background:#3c2024;color:#ffd5d5;border-color:#7c3c44}@keyframes premierChatOpen{from{opacity:0;transform:translateY(15px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes premierChatMessage{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes premierChatDot{50%{transform:translateY(-4px);opacity:.45}}@keyframes premierChatMic{50%{box-shadow:0 0 0 5px rgba(147,199,72,.17)}}@media(max-width:520px){.premier-chatbot{right:12px;bottom:12px}.premier-chat-window{right:-2px;bottom:59px;width:calc(100vw - 24px);height:min(600px,calc(100vh - 86px));border-radius:17px}.premier-chat-launcher{width:50px;height:50px;justify-content:center;padding:0;border-radius:50%}.premier-chat-launcher span{display:none}.premier-chat-header{padding:15px}.premier-chat-messages{padding:14px 11px}.premier-chat-message p,.premier-chat-markdown{max-width:87%;font-size:11px}}@media(prefers-reduced-motion:reduce){.premier-chatbot *{animation:none!important;transition:none!important}}`}</style>
-    <style>{`.premier-chat-header>.premier-chat-brand{min-width:0}.premier-chat-header>.premier-chat-brand>span{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:rgba(179,225,104,.16);color:#b5e168}.premier-chat-header>.premier-chat-actions{display:flex;align-items:center;gap:7px;flex:none}.premier-chat-language{display:flex;align-items:center;gap:4px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:5px 6px;color:#dcebf3;font-size:9px;font-weight:700;white-space:nowrap}.premier-chat-language svg{flex:none;color:#b5e168}.premier-chat-language select{min-width:0;max-width:76px;border:0;outline:0;background:transparent;color:#fff;font:700 9px Poppins,Arial,sans-serif;cursor:pointer}.premier-chat-language option{background:#0b5267;color:#fff}.premier-chat-page-link{display:inline-flex;align-items:center;margin-top:6px;border-bottom:1px solid #93c748;color:#5d9025;font-size:10px;font-weight:800;line-height:1.5;text-decoration:none;transition:color .2s,border-color .2s}.premier-chat-page-link:hover{border-color:#002e5e;color:#002e5e}.premier-chatbot.is-dark .premier-chat-language{border-color:#35647d}.premier-chatbot.is-dark .premier-chat-language select{color:#fff}.premier-chatbot.is-dark .premier-chat-page-link{color:#b5e168;border-color:#b5e168}@media(max-width:520px){.premier-chat-language span{display:none}.premier-chat-language{gap:2px;padding:5px}.premier-chat-language select{max-width:68px}.premier-chat-header>.premier-chat-actions{gap:5px}}`}</style>
+    <style>{`.premier-chat-header>.premier-chat-brand{min-width:0}.premier-chat-header>.premier-chat-brand>span{box-sizing:border-box;display:grid;place-items:center;flex:none;width:36px;min-width:36px;height:36px;aspect-ratio:1;padding:4px;overflow:hidden;border:1px solid rgba(0,46,94,.12);border-radius:50%;background:#fff;color:#b5e168}.premier-chat-brand-icon{display:block;width:26px;height:26px;border-radius:50%;object-fit:contain}.premier-chat-message-avatar{box-sizing:border-box;flex:none;width:30px;height:30px;margin:0 2px 4px 0;padding:4px;border:1px solid rgba(0,46,94,.12);border-radius:50%;background:#fff;object-fit:contain}.premier-chat-launcher-logo{box-sizing:border-box;display:block;width:32px;height:32px;padding:4px;border:1px solid rgba(0,46,94,.12);border-radius:50%;background:#fff;object-fit:contain}.premier-chat-header>.premier-chat-actions{display:flex;align-items:center;gap:7px;flex:none}.premier-chat-language{display:flex;align-items:center;gap:4px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:5px 6px;color:#dcebf3;font-size:9px;font-weight:700;white-space:nowrap}.premier-chat-language svg{flex:none;color:#b5e168}.premier-chat-language select{min-width:0;max-width:76px;border:0;outline:0;background:transparent;color:#fff;font:700 9px Poppins,Arial,sans-serif;cursor:pointer}.premier-chat-language option{background:#0b5267;color:#fff}.premier-chat-page-link{display:inline-flex;align-items:center;margin-top:6px;border-bottom:1px solid #93c748;color:#5d9025;font-size:10px;font-weight:800;line-height:1.5;text-decoration:none;transition:color .2s,border-color .2s}.premier-chat-page-link:hover{border-color:#002e5e;color:#002e5e}.premier-chatbot.is-dark .premier-chat-language{border-color:#35647d}.premier-chatbot.is-dark .premier-chat-language select{color:#fff}.premier-chatbot.is-dark .premier-chat-page-link{color:#b5e168;border-color:#b5e168}@media(max-width:520px){.premier-chat-language span{display:none}.premier-chat-language{gap:2px;padding:5px}.premier-chat-language select{max-width:68px}.premier-chat-header>.premier-chat-actions{gap:5px}}`}</style>
   </aside>;
 }
